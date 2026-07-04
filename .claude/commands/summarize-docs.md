@@ -1,5 +1,11 @@
+---
+description: docs/ の資料を要約して output/summary.md に書き出す
+---
+
 `docs/` 配下の資料を読み込み、要点をまとめて `output/summary.md` に書き出してください。
 
 - 見出しごとに箇条書きで要約する
 - 元資料に無い情報は書き加えない
 - 既存の `output/summary.md` がある場合は上書きしてよいか確認する
+
+追加の指示があれば従うこと: $ARGUMENTS
