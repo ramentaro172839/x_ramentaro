@@ -7,3 +7,7 @@ TikTok成長リサーチ（アフィリエイト活用目的）用のナレッ�
 - `prompts/tiktok_research_prompts.md` — リサーチ/競合分析/台本生成/コンプラチェック/週次レポート用プロンプト集
 - `.claude/skills/tiktok-growth-research/SKILL.md` — 上記を使って一連のリサーチ〜台本〜チェックを実行するClaude Codeスキル
 - `research/` — スキルを実行して生成したリサーチレポート
+- `content/queue/` — 投稿待ちパッケージ（画像+キャプション+固定コメント）。`posted/` は投稿済み
+- `scripts/generate_carousel.py` — slides.json からカルーセル画像一式を生成
+- `analytics/` — 投稿実績ログと学習メモ（PDCAの脳）
+- `docs/pdca_workflow.md` — 投稿→報告→分析→改善のPDCA運用手順

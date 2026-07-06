@@ -1,108 +1,115 @@
 #!/usr/bin/env python3
-"""カルーセル画像生成: HTMLテンプレート→Chromiumスクリーンショット(1080x1920)"""
-import os, subprocess, tempfile
+"""TikTokカルーセル投稿パッケージ生成ツール
+
+使い方:
+    python3 scripts/generate_carousel.py content/queue/post_001_quit_signs/slides.json
+
+slides.json の形式:
+{
+  "slug": "post_001_quit_signs",
+  "type": "共感型",              # 共感型 / 情報型 / 体験談型
+  "account": "@career_mayoi",
+  "eyebrow": "20代のキャリア迷子図鑑",
+  "slides": [
+    {"kind": "cover", "lead": "もしかして、", "title": "限界の<em>サイン</em><br>出てない？", "sub": "..."},
+    {"kind": "point", "n": 1, "total": 7, "label": "サイン", "title": "...", "sub": "..."},
+    {"kind": "cta", "title": "...", "body": "...", "dm_box": "...またはnull", "footer_right": "保存して見返す"}
+  ],
+  "caption": "キャプション本文 #ハッシュタグ",
+  "pinned_comment": "固定コメント文"
+}
+
+<em>...</em> はアクセント色、<br> は改行。
+出力: slides.json と同じディレクトリに img/*.png, caption.txt, comment.txt
+"""
+import json, os, subprocess, sys, tempfile
 
 CHROME = "/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell"
-OUT = "/home/user/x_ramentaro/assets/carousel_quit_signs_v1"
-os.makedirs(OUT, exist_ok=True)
 
 BASE_CSS = """
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { width:1080px; height:1920px; overflow:hidden; }
-body {
-  font-family:'Noto Sans CJK JP', sans-serif;
-  background:#12172b;
-  color:#f5f1e8;
-  display:flex; flex-direction:column;
-  padding:96px 84px;
-  position:relative;
-}
+body { font-family:'Noto Sans CJK JP', sans-serif; background:#12172b; color:#f5f1e8;
+  display:flex; flex-direction:column; padding:96px 84px; position:relative; }
+em { font-style:normal; color:#ffc857; }
 .eyebrow { font-size:34px; letter-spacing:0.18em; color:#ffc857; font-weight:700; }
-.footer { position:absolute; bottom:72px; left:84px; right:84px;
-  display:flex; justify-content:space-between; align-items:center;
-  font-size:30px; color:rgba(245,241,232,0.55); }
-.watermark { position:absolute; top:40px; right:64px;
-  font-size:400px; font-weight:900; color:rgba(255,200,87,0.08); line-height:1; }
-.swipe { color:#ffc857; font-weight:700; }
+.footer { position:absolute; bottom:72px; left:84px; right:84px; display:flex;
+  justify-content:space-between; align-items:center; font-size:30px; color:rgba(245,241,232,0.55); }
+.watermark { position:absolute; top:40px; right:64px; font-size:400px; font-weight:900;
+  color:rgba(255,200,87,0.08); line-height:1; }
+.accent { color:#ffc857; font-weight:700; }
 .bar { width:120px; height:10px; background:#ffc857; border-radius:6px; margin:48px 0; }
+.center { flex:1; display:flex; flex-direction:column; justify-content:center; }
+.dmbox { margin-top:64px; background:rgba(255,200,87,0.12); border:3px solid #ffc857;
+  border-radius:24px; padding:44px 48px; font-size:42px; line-height:1.7; }
 """
 
-def cover():
+def render_cover(s, meta):
+    lead = f'<div style="font-size:64px; color:rgba(245,241,232,0.85); font-weight:700;">{s["lead"]}</div>' if s.get("lead") else ""
     return f"""
-    <div class="eyebrow">20代のキャリア迷子図鑑</div>
-    <div style="flex:1; display:flex; flex-direction:column; justify-content:center;">
-      <div style="font-size:64px; color:rgba(245,241,232,0.85); font-weight:700;">もしかして、</div>
-      <div style="font-size:104px; font-weight:900; line-height:1.25; margin-top:16px;">
-        限界の<span style="color:#ffc857;">サイン</span><br>出てない？
-      </div>
+    <div class="eyebrow">{meta["eyebrow"]}</div>
+    <div class="center">
+      {lead}
+      <div style="font-size:100px; font-weight:900; line-height:1.3; margin-top:16px;">{s["title"]}</div>
       <div class="bar"></div>
-      <div style="font-size:46px; line-height:1.6; color:rgba(245,241,232,0.9);">
-        仕事を辞めたい人に出ている<br>
-        <b style="color:#ffc857;">7つのサイン</b>を集めました。
-      </div>
+      <div style="font-size:46px; line-height:1.6; color:rgba(245,241,232,0.9);">{s["sub"]}</div>
     </div>
-    <div class="footer"><span>@career_mayoi</span><span class="swipe">スワイプ →</span></div>
-    """
+    <div class="footer"><span>{meta["account"]}</span><span class="accent">スワイプ →</span></div>"""
 
-def sign(n, main, sub):
+def render_point(s, meta):
+    wm = f'<div class="watermark">{s["n"]}</div>' if s.get("n") else ""
+    eyebrow = f'{s.get("label","POINT")} {s["n"]}/{s["total"]}' if s.get("n") else s.get("label", meta["eyebrow"])
     return f"""
-    <div class="watermark">{n}</div>
-    <div class="eyebrow">サイン {n}/7</div>
-    <div style="flex:1; display:flex; flex-direction:column; justify-content:center;">
-      <div style="font-size:84px; font-weight:900; line-height:1.4;">{main}</div>
+    {wm}
+    <div class="eyebrow">{eyebrow}</div>
+    <div class="center">
+      <div style="font-size:82px; font-weight:900; line-height:1.4;">{s["title"]}</div>
       <div class="bar"></div>
-      <div style="font-size:44px; line-height:1.7; color:rgba(245,241,232,0.75);">{sub}</div>
+      <div style="font-size:44px; line-height:1.7; color:rgba(245,241,232,0.78);">{s["sub"]}</div>
     </div>
-    <div class="footer"><span>@career_mayoi</span><span class="swipe">スワイプ →</span></div>
-    """
+    <div class="footer"><span>{meta["account"]}</span><span class="accent">スワイプ →</span></div>"""
 
-def last():
+def render_cta(s, meta):
+    dm = f'<div class="dmbox">{s["dm_box"]}</div>' if s.get("dm_box") else ""
     return f"""
-    <div class="eyebrow">チェック結果</div>
-    <div style="flex:1; display:flex; flex-direction:column; justify-content:center;">
-      <div style="font-size:76px; font-weight:900; line-height:1.4;">
-        <span style="color:#ffc857;">3つ以上</span>当てはまったら、
-      </div>
-      <div style="font-size:84px; font-weight:900; line-height:1.4; margin-top:12px;">
-        それは<br>&quot;動き出していい&quot;<br>サイン。
-      </div>
+    <div class="eyebrow">{s.get("label", "まとめ")}</div>
+    <div class="center">
+      <div style="font-size:82px; font-weight:900; line-height:1.45;">{s["title"]}</div>
       <div class="bar"></div>
-      <div style="font-size:44px; line-height:1.8; color:rgba(245,241,232,0.9);">
-        いま全部やらなくていい。<br>
-        まずはこの投稿を<b style="color:#ffc857;">保存</b>して、<br>
-        自分のペースで見返してね。
-      </div>
-      <div style="margin-top:64px; background:rgba(255,200,87,0.12); border:3px solid #ffc857;
-                  border-radius:24px; padding:44px 48px; font-size:42px; line-height:1.7;">
-        誰かに話を聞いてほしいときは、<br>
-        DMで<b style="color:#ffc857;">『相談』</b>と送ってください。
-      </div>
+      <div style="font-size:44px; line-height:1.8; color:rgba(245,241,232,0.9);">{s["body"]}</div>
+      {dm}
     </div>
-    <div class="footer"><span>@career_mayoi</span><span class="swipe">保存して見返す</span></div>
-    """
+    <div class="footer"><span>{meta["account"]}</span><span class="accent">{s.get("footer_right", "保存して見返す")}</span></div>"""
 
-signs = [
-    ("日曜の夜になると、<br>気分が沈む", "月曜が近づくだけで重くなるのは、心のSOSかもしれない。"),
-    ("朝、体が布団から<br>動かない日がある", "それは甘えじゃなくて、疲労が積み重なっているだけ。"),
-    ("仕事の話をすると、<br>笑えなくなった", "感情がすり減っているサイン。楽しかった頃を思い出せる？"),
-    ("「あと何年これ<br>続けるんだろう」と考える", "未来にワクワクできない場所に、居続けなくていい。"),
-    ("休日も仕事のことが<br>頭から離れない", "心が休まる時間がゼロなら、それはもう休日じゃない。"),
-    ("頑張っても評価されない<br>気がする", "あなたの問題じゃなくて、環境が合っていないだけかも。"),
-    ("気づいたら転職サイトを<br>眺めている", "本音はもう、答えを出してるんじゃない？"),
-]
+RENDERERS = {"cover": render_cover, "point": render_point, "cta": render_cta}
 
-slides = [("01_cover", cover())]
-slides += [(f"{i+2:02d}_sign{i+1}", sign(i+1, m, s)) for i, (m, s) in enumerate(signs)]
-slides += [("09_cta", last())]
+def main(json_path):
+    with open(json_path) as f:
+        pkg = json.load(f)
+    base = os.path.dirname(os.path.abspath(json_path))
+    img_dir = os.path.join(base, "img")
+    os.makedirs(img_dir, exist_ok=True)
+    meta = {"account": pkg.get("account", "@career_mayoi"),
+            "eyebrow": pkg.get("eyebrow", "20代のキャリア迷子図鑑")}
 
-for name, body in slides:
-    html = f"<!doctype html><html><head><meta charset='utf-8'><style>{BASE_CSS}</style></head><body>{body}</body></html>"
-    with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as f:
-        f.write(html); path = f.name
-    out = f"{OUT}/{name}.png"
-    subprocess.run([CHROME, "--headless", "--no-sandbox", "--disable-gpu",
-                    "--screenshot=" + out, "--window-size=1080,1920",
-                    "--hide-scrollbars", "--force-device-scale-factor=1",
-                    "file://" + path], check=True, capture_output=True)
-    os.unlink(path)
-    print("OK", out)
+    for i, s in enumerate(pkg["slides"], 1):
+        body = RENDERERS[s["kind"]](s, meta)
+        html = f"<!doctype html><html><head><meta charset='utf-8'><style>{BASE_CSS}</style></head><body>{body}</body></html>"
+        with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as f:
+            f.write(html); path = f.name
+        out = os.path.join(img_dir, f"{i:02d}_{s['kind']}.png")
+        subprocess.run([CHROME, "--headless", "--no-sandbox", "--disable-gpu",
+                        "--screenshot=" + out, "--window-size=1080,1920",
+                        "--hide-scrollbars", "--force-device-scale-factor=1",
+                        "file://" + path], check=True, capture_output=True)
+        os.unlink(path)
+
+    with open(os.path.join(base, "caption.txt"), "w") as f:
+        f.write(pkg["caption"] + "\n")
+    with open(os.path.join(base, "comment.txt"), "w") as f:
+        f.write(pkg["pinned_comment"] + "\n")
+    print(f"OK {pkg['slug']}: {len(pkg['slides'])} slides -> {img_dir}")
+
+if __name__ == "__main__":
+    for p in sys.argv[1:]:
+        main(p)

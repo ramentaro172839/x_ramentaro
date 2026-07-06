@@ -60,6 +60,16 @@ TikTokで「今伸びているもの」を継続的にリサーチし、企画�
 - 単発の依頼ならチャット上に構造化して回答する。
 - 継続調査の場合は `research/tiktok_trend_report_YYYY-MM-DD.md` に保存し、保存先を伝える。
 
+### ステップ7: PDCA運用（投稿の実績管理。詳細は docs/pdca_workflow.md）
+- **「post_XXXを投稿した」と言われたら**: 該当ディレクトリを `content/queue/` から `content/posted/` へ移動し、
+  `analytics/performance_log.csv` に posted_at を記録してコミットする。
+- **数値報告を受けたら**: performance_log.csv に記録→過去投稿と比較分析→ `analytics/learnings.md` の仮説を検証/棄却/追加
+  （3本ごとに仮説全体を見直す）→分析結果と次のアクションを短く報告する。
+- **新バッチ生成時**: 必ず learnings.md を先に読み、検証済みの学びを反映し、新たに検証したい仮説を1つ組み込む。
+  生成は `scripts/generate_carousel.py`（slides.json駆動）を使う。
+- **queueが3本を切ったら**: 次バッチの生成を自動で提案する。
+- **フォロワー1,000人に達したら**: フェーズ2（ASP登録・案件選定）への移行を提案する。
+
 ## 判断基準（ガードレール）
 
 - **法令・規約遵守は最優先**: PR表記なし・薬機法NG表現あり・コールドDM前提の成果物は納品しない。
