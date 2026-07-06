@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "cc-company": {
+      "source": {
+        "source": "github",
+        "repo": "Shin-sibainu/cc-company"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "company@cc-company": true
+  }
+}
